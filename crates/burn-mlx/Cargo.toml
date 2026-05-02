@@ -1,0 +1,41 @@
+[package]
+name = "burn-mlx"
+version = "0.1.2"
+edition = "2024"
+authors = ["TuringWorks"]
+description = "MLX backend for Burn deep learning framework - native Apple Silicon GPU acceleration"
+license = "Apache-2.0"
+repository = "https://github.com/TuringWorks/burn-mlx"
+homepage = "https://github.com/TuringWorks/burn-mlx"
+documentation = "https://github.com/TuringWorks/burn-mlx#readme"
+readme = "README.md"
+keywords = ["burn", "mlx", "apple-silicon", "machine-learning", "gpu"]
+categories = ["science", "algorithms"]
+
+[package.metadata.docs.rs]
+# docs.rs cannot build this crate (requires macOS + Apple Silicon)
+# Point users to the README for documentation
+targets = ["aarch64-apple-darwin"]
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+default = []
+# Fusion optimization (combining multiple operations)
+fusion = []
+# Autodiff support
+autotune = []
+
+[dependencies]
+burn = { workspace = true }
+burn-backend = { workspace = true }
+burn-tensor = { workspace = true }
+mlx-rs = { package = "mlx-rs-burn", version = "0.25.5" }
+mlx-sys = { package = "mlx-sys-burn", version = "0.2" }
+derive-new = "0.7"
+enumset = "1"
+half = { version = "2.4", features = ["num-traits"] }
+num-traits = "0.2"
+
+[dev-dependencies]
+burn = { workspace = true, features = ["train", "dataset"] }
+serial_test = "3.2"

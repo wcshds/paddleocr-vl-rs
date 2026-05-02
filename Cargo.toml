@@ -1,0 +1,15 @@
+[workspace]
+members = [
+    "crates/burn-mlx",
+    "crates/paddleocr-vl",
+    "crates/pp-doclayout",
+    "crates/paddleocr-vl-pipeline",
+]
+resolver = "3"
+
+[workspace.dependencies]
+burn = { version = "0.21.0-pre.4", features = ["std"] }
+burn-backend = { version = "0.21.0-pre.4" }
+burn-mlx = { path = "crates/burn-mlx" }
+burn-store = { version = "0.21.0-pre.4" }
+burn-tensor = { version = "0.21.0-pre.4" }

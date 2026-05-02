@@ -1,0 +1,29 @@
+[package]
+name = "paddleocr-vl-pipeline"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["flex", "cpu"]
+cpu = ["burn/cpu", "paddleocr-vl/cpu", "pp-doclayout/cpu"]
+cuda = ["burn/cuda", "paddleocr-vl/cuda", "pp-doclayout/cuda"]
+flex = ["burn/flex", "paddleocr-vl/flex", "pp-doclayout/flex"]
+metal = ["burn/metal", "paddleocr-vl/metal", "pp-doclayout/metal"]
+ndarray = ["burn/ndarray", "paddleocr-vl/ndarray", "pp-doclayout/ndarray"]
+vulkan = ["burn/vulkan", "paddleocr-vl/vulkan", "pp-doclayout/vulkan"]
+wgpu = ["burn/wgpu", "paddleocr-vl/wgpu", "pp-doclayout/wgpu"]
+mlx = ["dep:burn-mlx", "paddleocr-vl/mlx", "pp-doclayout/mlx"]
+
+[dependencies]
+burn = { workspace = true }
+half = "2"
+image = "0.25.10"
+paddleocr-vl = { path = "../paddleocr-vl", default-features = false }
+pp-doclayout = { path = "../pp-doclayout", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+burn-mlx = { workspace = true, optional = true }
+
+[dev-dependencies]
+clap = { version = "4.6.1", features = ["derive"] }
+indicatif = "0.18.4"

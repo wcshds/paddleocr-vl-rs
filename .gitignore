@@ -1,0 +1,9 @@
+/target
+/model*
+/.DS_Store
+/output
+*/**/__pycache__/
+/test.ipynb
+/test.py
+*/**/.DS_Store
+/samples

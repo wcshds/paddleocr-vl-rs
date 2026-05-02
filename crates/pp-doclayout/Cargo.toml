@@ -1,0 +1,30 @@
+[package]
+name = "pp-doclayout"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["flex", "cpu"]
+cpu = ["burn/cpu"]
+cuda = ["burn/cuda"]
+flex = ["burn/flex"]
+metal = ["burn/metal"]
+ndarray = ["burn/ndarray"]
+vulkan = ["burn/vulkan"]
+wgpu = ["burn/wgpu"]
+mlx = ["dep:burn-mlx"]
+
+[dependencies]
+burn = { workspace = true }
+burn-store = { workspace = true }
+half = "2"
+image = "0.25.10"
+burn-mlx = { workspace = true, optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+clap = { version = "4.6.1", features = ["derive"] }
+indicatif = "0.18.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

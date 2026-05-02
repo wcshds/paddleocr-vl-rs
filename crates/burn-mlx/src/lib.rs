@@ -1,0 +1,297 @@
+//! Burn backend for Apple MLX framework.
+//!
+//! This crate provides a Burn backend implementation that leverages Apple's MLX
+//! framework for high-performance machine learning on Apple Silicon. Unsupported
+//! Burn operations are rejected explicitly rather than emulated with placeholder
+//! results.
+//!
+//! ## Features
+//!
+//! - **Burn Backend Coverage**: Implements the core tensor, module, and
+//!   activation operation traits used by the PaddleOCR-VL models
+//! - **Unified Memory**: Zero-copy data sharing between CPU and GPU
+//! - **Lazy Evaluation**: MLX graph evaluation and operation scheduling
+//! - **Apple Silicon Optimized**: Native support for M-series Neural Engine
+//!
+//! ## Requirements
+//!
+//! - macOS 13.3+ (Ventura)
+//! - Apple Silicon (M1/M2/M3/M4/M5)
+//! - Rust 1.82+
+//!
+//! ## Usage
+//!
+//! ```ignore
+//! use burn::prelude::*;
+//! use burn_mlx::Mlx;
+//!
+//! // Use MLX as the backend
+//! type Backend = Mlx;
+//!
+//! // Create tensors
+//! let device = <Backend as burn::tensor::backend::Backend>::Device::default();
+//! let x: Tensor<Backend, 2> = Tensor::ones([2, 3], &device);
+//! let y: Tensor<Backend, 2> = Tensor::ones([3, 4], &device);
+//! let z = x.matmul(y);
+//! ```
+//!
+//! ## With Autodiff
+//!
+//! ```ignore
+//! use burn::prelude::*;
+//! use burn_autodiff::Autodiff;
+//! use burn_mlx::Mlx;
+//!
+//! type TrainBackend = Autodiff<Mlx>;
+//!
+//! // Now you can use automatic differentiation with MLX
+//! ```
+
+mod backend;
+mod device;
+mod element;
+mod ops;
+mod tensor;
+
+// Public exports
+pub use backend::{Mlx, MlxQuantizedTensorPrimitive, MlxTensorPrimitive};
+pub use device::MlxDevice;
+pub use element::{FloatMlxElement, MlxElement};
+pub use tensor::MlxTensor;
+
+/// Half-precision (f16) MLX backend for faster inference on Apple Silicon.
+pub type MlxHalf = Mlx<half::f16>;
+
+/// BFloat16 MLX backend.
+pub type MlxBf16 = Mlx<half::bf16>;
+
+/// Re-export mlx-rs types for advanced usage.
+pub mod mlx {
+    pub use mlx_rs::*;
+}
+
+/// Fast fused operations backed by MLX Metal kernels.
+///
+/// These bypass burn's decomposed tensor ops and call MLX's optimized
+/// implementations directly. Use them for performance-critical paths
+/// when you control the model code.
+pub mod fast {
+    use mlx_rs::Array;
+
+    /// Fused layer normalization using MLX's optimized Metal kernel.
+    ///
+    /// Normalizes with respect to the last axis of `x`.
+    /// Equivalent to `burn_nn::LayerNorm` but executed as a single fused kernel.
+    pub fn layer_norm(x: &Array, weight: Option<&Array>, bias: Option<&Array>, eps: f32) -> Array {
+        mlx_rs::fast::layer_norm(x, weight, bias, eps).expect("fast layer_norm")
+    }
+
+    /// Fused RMS normalization using MLX's optimized Metal kernel.
+    ///
+    /// Normalizes with respect to the last axis of `x`.
+    pub fn rms_norm(x: &Array, weight: &Array, eps: f32) -> Array {
+        mlx_rs::fast::rms_norm(x, weight, eps).expect("fast rms_norm")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use burn_tensor::{Shape, Tensor, TensorData};
+
+    #[test]
+    fn test_device_creation() {
+        let _device = MlxDevice::Gpu;
+        let _cpu = MlxDevice::Cpu;
+    }
+
+    #[test]
+    fn test_tensor_creation_raw() {
+        let tensor = MlxTensor::<f32>::ones(&[2, 3], MlxDevice::Gpu);
+        assert_eq!(tensor.shape(), vec![2, 3]);
+    }
+
+    #[test]
+    fn test_tensor_operations_raw() {
+        let a = MlxTensor::<f32>::ones(&[2, 3], MlxDevice::Gpu);
+        let b = MlxTensor::<f32>::ones(&[2, 3], MlxDevice::Gpu);
+        let c = a.add(&b);
+        assert_eq!(c.shape(), vec![2, 3]);
+    }
+
+    #[test]
+    fn test_matmul_raw() {
+        let a = MlxTensor::<f32>::ones(&[2, 3], MlxDevice::Gpu);
+        let b = MlxTensor::<f32>::ones(&[3, 4], MlxDevice::Gpu);
+        let c = a.matmul(&b);
+        assert_eq!(c.shape(), vec![2, 4]);
+    }
+
+    #[test]
+    fn test_burn_backend_tensor_creation() {
+        let device = MlxDevice::default();
+
+        // Test from_data
+        let data = TensorData::from([1.0f32, 2.0, 3.0, 4.0]);
+        let tensor: Tensor<Mlx, 1> = Tensor::from_data(data, &device);
+        assert_eq!(tensor.shape().dims(), [4]);
+    }
+
+    #[test]
+    fn test_burn_backend_arithmetic() {
+        let device = MlxDevice::default();
+
+        let a: Tensor<Mlx, 2> = Tensor::from_data([[1.0f32, 2.0], [3.0, 4.0]], &device);
+        let b: Tensor<Mlx, 2> = Tensor::from_data([[5.0f32, 6.0], [7.0, 8.0]], &device);
+
+        let sum = a.clone() + b.clone();
+        let diff = a.clone() - b.clone();
+        let prod = a.clone() * b.clone();
+        let quot = a / b;
+
+        assert_eq!(sum.shape().dims(), [2, 2]);
+        assert_eq!(diff.shape().dims(), [2, 2]);
+        assert_eq!(prod.shape().dims(), [2, 2]);
+        assert_eq!(quot.shape().dims(), [2, 2]);
+    }
+
+    #[test]
+    fn test_burn_backend_matmul() {
+        let device = MlxDevice::default();
+
+        let a: Tensor<Mlx, 2> = Tensor::from_data([[1.0f32, 2.0, 3.0], [4.0, 5.0, 6.0]], &device);
+        let b: Tensor<Mlx, 2> = Tensor::from_data([[1.0f32, 2.0], [3.0, 4.0], [5.0, 6.0]], &device);
+
+        let c = a.matmul(b);
+        assert_eq!(c.shape().dims(), [2, 2]);
+    }
+
+    #[test]
+    fn test_burn_backend_activations() {
+        let device = MlxDevice::default();
+
+        let x: Tensor<Mlx, 1> = Tensor::from_data([-1.0f32, 0.0, 1.0, 2.0], &device);
+
+        let relu = burn_tensor::activation::relu(x.clone());
+        let sigmoid = burn_tensor::activation::sigmoid(x.clone());
+        let softmax = burn_tensor::activation::softmax(x.clone(), 0);
+
+        assert_eq!(relu.shape().dims(), [4]);
+        assert_eq!(sigmoid.shape().dims(), [4]);
+        assert_eq!(softmax.shape().dims(), [4]);
+    }
+
+    #[test]
+    fn test_avg_pool2d() {
+        use burn_tensor::ops::ModuleOps;
+
+        let device = MlxDevice::default();
+
+        // Create a 4D tensor: [N, C, H, W] = [1, 1, 4, 4]
+        let data: Vec<f32> = (0..16).map(|x| x as f32).collect();
+        let x: Tensor<Mlx, 4> =
+            Tensor::from_data(TensorData::new(data, Shape::new([1, 1, 4, 4])), &device);
+
+        // Apply avg_pool2d with kernel_size=2, stride=2
+        let pooled = Mlx::<f32>::avg_pool2d(
+            x.into_primitive().tensor(),
+            [2, 2],
+            [2, 2],
+            [0, 0],
+            false,
+            false,
+        );
+
+        let shape = pooled.shape();
+        assert_eq!(shape, vec![1, 1, 2, 2]);
+    }
+
+    #[test]
+    fn test_max_pool2d() {
+        use burn_tensor::ops::ModuleOps;
+
+        let device = MlxDevice::default();
+
+        // Create a 4D tensor: [N, C, H, W] = [1, 1, 4, 4]
+        let data: Vec<f32> = (0..16).map(|x| x as f32).collect();
+        let x: Tensor<Mlx, 4> =
+            Tensor::from_data(TensorData::new(data, Shape::new([1, 1, 4, 4])), &device);
+
+        // Apply max_pool2d with kernel_size=2, stride=2
+        let pooled = Mlx::<f32>::max_pool2d(
+            x.into_primitive().tensor(),
+            [2, 2],
+            [2, 2],
+            [0, 0],
+            [1, 1],
+            false,
+        );
+
+        let shape = pooled.shape();
+        assert_eq!(shape, vec![1, 1, 2, 2]);
+    }
+
+    #[test]
+    fn test_max_pool2d_with_indices() {
+        use burn_tensor::ops::ModuleOps;
+
+        let device = MlxDevice::default();
+
+        // Create a 4D tensor: [N, C, H, W] = [1, 1, 4, 4]
+        let data: Vec<f32> = (0..16).map(|x| x as f32).collect();
+        let x: Tensor<Mlx, 4> =
+            Tensor::from_data(TensorData::new(data, Shape::new([1, 1, 4, 4])), &device);
+
+        // Apply max_pool2d_with_indices with kernel_size=2, stride=2
+        let result = Mlx::<f32>::max_pool2d_with_indices(
+            x.into_primitive().tensor(),
+            [2, 2],
+            [2, 2],
+            [0, 0],
+            [1, 1],
+            false,
+        );
+
+        let output_shape = result.output.shape();
+        let indices_shape = result.indices.shape();
+
+        assert_eq!(output_shape, vec![1, 1, 2, 2]);
+        assert_eq!(indices_shape, vec![1, 1, 2, 2]);
+    }
+
+    #[test]
+    fn test_avg_pool1d() {
+        use burn_tensor::ops::ModuleOps;
+
+        let device = MlxDevice::default();
+
+        // Create a 3D tensor: [N, C, L] = [1, 2, 8]
+        let data: Vec<f32> = (0..16).map(|x| x as f32).collect();
+        let x: Tensor<Mlx, 3> =
+            Tensor::from_data(TensorData::new(data, Shape::new([1, 2, 8])), &device);
+
+        // Apply avg_pool1d with kernel_size=2, stride=2
+        let pooled = Mlx::<f32>::avg_pool1d(x.into_primitive().tensor(), 2, 2, 0, false, false);
+
+        let shape = pooled.shape();
+        assert_eq!(shape, vec![1, 2, 4]);
+    }
+
+    #[test]
+    fn test_max_pool1d() {
+        use burn_tensor::ops::ModuleOps;
+
+        let device = MlxDevice::default();
+
+        // Create a 3D tensor: [N, C, L] = [1, 2, 8]
+        let data: Vec<f32> = (0..16).map(|x| x as f32).collect();
+        let x: Tensor<Mlx, 3> =
+            Tensor::from_data(TensorData::new(data, Shape::new([1, 2, 8])), &device);
+
+        // Apply max_pool1d with kernel_size=2, stride=2
+        let pooled = Mlx::<f32>::max_pool1d(x.into_primitive().tensor(), 2, 2, 0, 1, false);
+
+        let shape = pooled.shape();
+        assert_eq!(shape, vec![1, 2, 4]);
+    }
+}
