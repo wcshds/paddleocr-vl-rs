@@ -72,15 +72,18 @@ cargo run --release --package pp-doclayout --example cli --features wgpu,metal,m
 Direct PaddleOCR-VL element recognition & text spotting:
 
 ```bash
+# use flex backend.
 cargo run --release --package paddleocr-vl  --example cli --features wgpu,metal,mlx -- --version 1.5 --backend flex --dtype f32 --task seal ./samples/seal.png
+# use tch backend with mps device.
+cargo run --release --package paddleocr-vl --example cli --features tch -- --version 1.5 --backend tch --device mps --dtype bf16 --task seal ./samples/seal.png
 cargo run --release --package paddleocr-vl  --example cli --features wgpu,metal,mlx -- --version 1.5 --backend mlx --dtype f32 --task spotting ./samples/0506.png
 ```
 
 Common CLI options:
 
-- `--backend <cpu|cuda|flex|metal|mlx|ndarray|vulkan|wgpu>`: backend to use.
+- `--backend <cpu|cuda|flex|tch|metal|mlx|vulkan|wgpu>`: backend to use.
   Default: `flex`.
-- `--device <SPEC>`: backend device. Examples: `cuda:1` for Cuda, `gpu` or `cpu` for MLX, and `discrete:0`, `integrated:0`, `cpu`, or `default` for WGPU-style backends.
+- `--device <SPEC>`: backend device. Examples: `cuda:1` for CUDA or tch, `gpu` or `cpu` for MLX, `mps`/`metal` for tch on Apple Silicon, and `discrete:0`, `integrated:0`, `cpu`, or `default` for WGPU-style backends.
 - `--dtype <f32|f16|bf16>`: model weight dtype. Default: `f32`. Low precision is a speed/memory option and is not guaranteed to match f32 token-for-token; precision-sensitive preprocessing, RoPE, and greedy logits are kept in f32 internally where supported.
 
 Enable a backend feature when running a non-default backend:

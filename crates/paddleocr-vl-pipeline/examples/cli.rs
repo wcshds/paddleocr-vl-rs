@@ -13,16 +13,16 @@ enum BackendArg {
     Cpu,
     Cuda,
     Flex,
+    Tch,
     Metal,
     Mlx,
-    Ndarray,
     Vulkan,
     Wgpu,
 }
 
-// Keep this support matrix explicit: NdArray is f32-only in Burn 0.21.0-pre.4,
-// Flex uses one backend type with dtype-selected storage/arithmetic, and Vulkan
-// builds require the Vulkan SDK on macOS.
+// Keep this support matrix explicit: Flex uses one backend type with
+// dtype-selected storage/arithmetic, and Vulkan builds require the Vulkan SDK
+// on macOS.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum DTypeArg {
     F32,
@@ -146,7 +146,7 @@ fn device_spec(cli: &Cli) -> Option<&str> {
         .filter(|s| !s.is_empty())
 }
 
-#[cfg(any(feature = "cpu", feature = "flex", feature = "ndarray"))]
+#[cfg(any(feature = "cpu", feature = "flex"))]
 fn ensure_default_device(cli: &Cli, backend: &str) -> Result<(), String> {
     match device_spec(cli) {
         None | Some("default") | Some("cpu") => Ok(()),
@@ -154,6 +154,35 @@ fn ensure_default_device(cli: &Cli, backend: &str) -> Result<(), String> {
             "backend {backend} only supports the default CPU device, got '{other}'"
         )),
     }
+}
+
+#[cfg(feature = "tch")]
+fn parse_tch_device(cli: &Cli) -> Result<burn::backend::libtorch::LibTorchDevice, String> {
+    use burn::backend::libtorch::LibTorchDevice;
+
+    let Some(spec) = device_spec(cli) else {
+        return Ok(LibTorchDevice::Cpu);
+    };
+    let lower = spec.to_ascii_lowercase();
+    match lower.as_str() {
+        "default" | "cpu" => return Ok(LibTorchDevice::Cpu),
+        "cuda" | "gpu" => return Ok(LibTorchDevice::Cuda(0)),
+        "mps" | "metal" => return Ok(LibTorchDevice::Mps),
+        "vulkan" => return Ok(LibTorchDevice::Vulkan),
+        _ => {}
+    }
+
+    let index = lower
+        .strip_prefix("cuda:")
+        .or_else(|| lower.strip_prefix("gpu:"))
+        .unwrap_or(&lower);
+    if let Ok(index) = index.parse::<usize>() {
+        return Ok(LibTorchDevice::Cuda(index));
+    }
+
+    Err(format!(
+        "backend tch expects --device cpu, mps, metal, vulkan, cuda:<index>, gpu:<index>, or <index>, got '{spec}'"
+    ))
 }
 
 #[cfg(feature = "cuda")]
@@ -333,9 +362,9 @@ fn run_selected_backend(cli: &Cli) -> Result<(), String> {
         BackendArg::Cpu => run_cpu(cli),
         BackendArg::Cuda => run_cuda(cli),
         BackendArg::Flex => run_flex(cli),
+        BackendArg::Tch => run_tch(cli),
         BackendArg::Metal => run_metal(cli),
         BackendArg::Mlx => run_mlx(cli),
-        BackendArg::Ndarray => run_ndarray(cli),
         BackendArg::Vulkan => run_vulkan(cli),
         BackendArg::Wgpu => run_wgpu(cli),
     }
@@ -386,6 +415,21 @@ fn run_flex(_cli: &Cli) -> Result<(), String> {
     Err("backend flex was requested, but feature `flex` is not enabled".into())
 }
 
+#[cfg(feature = "tch")]
+fn run_tch(cli: &Cli) -> Result<(), String> {
+    let device = parse_tch_device(cli)?;
+    match cli.dtype {
+        DTypeArg::F32 => run::<burn::backend::LibTorch>(device, cli),
+        DTypeArg::F16 => run::<burn::backend::LibTorch<half::f16>>(device, cli),
+        DTypeArg::Bf16 => run::<burn::backend::LibTorch<half::bf16>>(device, cli),
+    }
+}
+
+#[cfg(not(feature = "tch"))]
+fn run_tch(_cli: &Cli) -> Result<(), String> {
+    Err("backend tch was requested, but feature `tch` is not enabled".into())
+}
+
 #[cfg(feature = "metal")]
 fn run_metal(cli: &Cli) -> Result<(), String> {
     let device = parse_wgpu_device::<burn::backend::Metal>(cli, "metal")?;
@@ -414,23 +458,6 @@ fn run_mlx(cli: &Cli) -> Result<(), String> {
 #[cfg(not(feature = "mlx"))]
 fn run_mlx(_cli: &Cli) -> Result<(), String> {
     Err("backend mlx was requested, but feature `mlx` is not enabled".into())
-}
-
-#[cfg(feature = "ndarray")]
-fn run_ndarray(cli: &Cli) -> Result<(), String> {
-    ensure_default_device(cli, "ndarray")?;
-    match cli.dtype {
-        DTypeArg::F32 => run::<burn::backend::NdArray>(Default::default(), cli),
-        DTypeArg::F16 | DTypeArg::Bf16 => Err(format!(
-            "backend ndarray does not support dtype {:?}",
-            cli.dtype
-        )),
-    }
-}
-
-#[cfg(not(feature = "ndarray"))]
-fn run_ndarray(_cli: &Cli) -> Result<(), String> {
-    Err("backend ndarray was requested, but feature `ndarray` is not enabled".into())
 }
 
 #[cfg(feature = "vulkan")]

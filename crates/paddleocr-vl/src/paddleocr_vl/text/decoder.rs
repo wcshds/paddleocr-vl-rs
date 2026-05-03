@@ -495,6 +495,7 @@ impl<B: Backend> PaddleOcrTextAttention<B> {
         cache: Option<LayerKVCache<B>>,
     ) -> (Tensor<B, 3>, LayerKVCache<B>) {
         let [batch_size, seq_len, _] = hidden_states.dims();
+        let is_prefill = cache.is_none();
 
         let query_states = self
             .q_proj
@@ -542,7 +543,7 @@ impl<B: Backend> PaddleOcrTextAttention<B> {
             None,
             None,
             AttentionModuleOptions {
-                is_causal: true,
+                is_causal: is_prefill,
                 ..Default::default()
             },
         );

@@ -50,9 +50,9 @@ cargo run -p pp-doclayout --example cli -- image.png
 Options:
 
 - `--version <v2|v3>`: layout model version. Default: `v2`.
-- `--backend <cpu|cuda|flex|metal|mlx|ndarray|vulkan|wgpu>`: Burn backend.
+- `--backend <cpu|cuda|flex|tch|metal|mlx|vulkan|wgpu>`: Burn backend.
   Default: `flex`.
-- `--device <SPEC>`: backend device selector. Defaults to the backend's default device. Examples: `0` or `cuda:0` for CUDA, `gpu`/`cpu` for MLX, and `default`, `cpu`, `discrete:0`, `integrated:0`, `virtual:0`, or bare `0` for WGPU-style backends (`metal`, `vulkan`, `wgpu`).
+- `--device <SPEC>`: backend device selector. Defaults to the backend's default device. Examples: `0` or `cuda:0` for CUDA/tch, `gpu`/`cpu` for MLX, `mps`/`metal` for tch on Apple Silicon, and `default`, `cpu`, `discrete:0`, `integrated:0`, `virtual:0`, or bare `0` for WGPU-style backends (`metal`, `vulkan`, `wgpu`).
 - `--dtype <f32|f16|bf16>`: model weight dtype. Default: `f32`.
 - `--model <FILE>`: safetensors checkpoint path. If omitted, the version default path is used.
 - `--threshold <FLOAT>`: detection score threshold. Defaults are `0.5` for V2 and `0.3` for V3.
@@ -60,5 +60,4 @@ Options:
 
 Backend notes:
 
-- `ndarray` supports only `f32` in this example.
 - `flex` uses one backend type; precision is selected by `--dtype`.

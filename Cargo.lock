@@ -1104,6 +1104,7 @@ dependencies = [
  "burn-cubecl",
  "burn-flex",
  "burn-ir",
+ "burn-tch",
  "burn-tensor",
  "bytemuck",
  "cubecl",

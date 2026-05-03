@@ -59,10 +59,11 @@ cargo run -p paddleocr-vl-pipeline --example cli -- image.png
 Options:
 
 - `--version <v1|v1.5>`: pipeline preset. Default: `v1.5`.
-- `--backend <cpu|cuda|flex|metal|mlx|ndarray|vulkan|wgpu>`: Burn backend.
+- `--backend <cpu|cuda|flex|tch|metal|mlx|vulkan|wgpu>`: Burn backend.
   Default: `flex`.
 - `--device <SPEC>`: backend device selector. Defaults to the backend's default
-  device. Examples: `0` or `cuda:0` for CUDA, `gpu`/`cpu` for MLX, and
+  device. Examples: `0` or `cuda:0` for CUDA/tch, `gpu`/`cpu` for MLX,
+  `mps`/`metal` for tch on Apple Silicon, and
   `default`, `cpu`, `discrete:0`, `integrated:0`, `virtual:0`, or bare `0` for
   WGPU-style backends (`metal`, `vulkan`, `wgpu`).
 - `--dtype <f32|f16|bf16>`: model weight dtype. Default: `f32`.
@@ -83,6 +84,5 @@ Options:
 
 Backend notes:
 
-- `ndarray` supports only `f32` in this example.
 - `flex` uses one backend type; precision is selected by `--dtype`.
 - `vulkan` requires a local Vulkan SDK on macOS.
