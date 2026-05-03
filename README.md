@@ -59,8 +59,10 @@ Use `--output <DIR>` to place `model1.0` and `model1.5` somewhere else. If you d
 Page-level parsing:
 
 ```bash
-# Test on MacBook Pro M4 Pro.
+# Test on MacBook Pro M4 Pro, using mlx backend.
 cargo run --release --package paddleocr-vl-pipeline --example cli --features mlx -- --version 1.5 --backend mlx --dtype bf16 --save-json ./output --save-markdown ./output ./samples
+# Test on MacBook Pro M4 Pro, using tch backend.
+cargo run --release --package paddleocr-vl-pipeline --example cli --features tch -- --version 1.5 --backend tch --device mps --dtype bf16 --save-json ./output --save-markdown ./output ./samples
 ```
 
 Layout detection:
